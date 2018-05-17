@@ -1,36 +1,63 @@
+# Outputlib
+from oemof import outputlib
+
+# Default logger of oemof
 from oemof.tools import logger
 from oemof.tools import helpers
-
 import oemof.solph as solph
-import oemof.outputlib as outputlib
 
+# import oemof base classes to create energy system objects
 import logging
 import os
 import pandas as pd
-import pprint as pp
-
-try:
-    import matplotlib.pyplot as plt
-except ImportError:
-    plt = None
-
-
-solver = 'cbc'  # 'glpk', 'gurobi',....
-debug = False  # Set number_of_timesteps to 3 to get a readable lp-file.
-number_of_time_steps = 24*7*8
-solver_verbose = False  # show/hide solver output
-
-# initiate the logger (see the API docs for more information)
-logger.define_logging(logfile='oemof_example.log',
-                      screen_level=logging.INFO,
-                      file_level=logging.DEBUG)
-
-logging.info('Initialize the energy system')
-date_time_index = pd.date_range('1/1/2012', periods=number_of_time_steps,
-                                freq='H')
+import warnings
+############
+# 1 initialize energysystem
+############
+date_time_index = pd.range('1/1/2018', periods = 8760, freq = 'H' )
 
 energysystem = solph.EnergySystem(timeindex=date_time_index)
 
-# Read data file
-filename = os.path.join(os.path.dirname(__file__), 'basic_example.csv')
-data = pd.read_csv(filename)
+
+###########
+#2 read in all necessary data
+##########
+
+# Read data file with heat and electrical demand (192 hours)
+#full_filename = os.path.join(os.path.dirname(__file__), filename)
+#data = pd.read_csv(full_filename, sep=",")
+
+###########
+# 3 Built the network
+##########
+
+# Create all Buses
+bcoal = solph.Bus(label = "coal") 
+
+bgas = solph.Bus(label = "gas")
+
+bel = solph.Bus(label = "electricity")
+
+# add all Buses to the EnergySystem
+
+energysystem.add(bcoal, bgas, bel)
+
+# create simple sink object for electrical demand for each electrical bus
+#solph.Sink(label='demand_elec', inputs={bel: solph.Flow(
+#        actual_value= data['demand_el'], fixed=True, nominal_value=1)})
+
+
+# Create all Transformers
+
+# create simple transformer object representing a gas power plant
+energysystem.add(solph.Transformer(
+    label="pp_gas",
+    inputs={bgas: solph.Flow()},
+    outputs={bel: solph.Flow(nominal_value=10e10, variable_costs=50)},
+    conversion_factors={bel: 0.58}))
+
+energysystem.add(solph.Transformer(
+        label="pp_coal", 
+        inputs={bcoal: solph.Flow()}, 
+        outputs = {bel: solph.Flow(nominal_value=10e10, variable_costs=50)},
+        conversion_factor ={bel:0.4}))
